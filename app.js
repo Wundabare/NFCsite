@@ -1,9 +1,10 @@
 document.addEventListener('DOMContentLoaded', function() {
+  console.log("DOM fully loaded and parsed.");
   const scanNFCButton = document.getElementById('scan-nfc');
   let pasteKey = '';  // Will hold the Pastebin paste key after it's created
 
-  const PASTEBIN_API_KEY = 'OKC8f3WSNJk1Ugk6MuZbRYJHGWS80vVf'; 
-  const PASTEBIN_USER_KEY = 'f2883ad0e7fedcf32d6dce37c11e3588'; 
+  const PASTEBIN_API_KEY = 'your-pastebin-api-key'; // Replace with your API key
+  const PASTEBIN_USER_KEY = 'your-pastebin-user-key'; // Replace with your User key
 
   // CORS Proxy for handling Pastebin restrictions
   const CORS_PROXY = 'https://cors-anywhere.herokuapp.com/';
@@ -54,6 +55,9 @@ document.addEventListener('DOMContentLoaded', function() {
       const borrowedOn = new Date();
       const returnBy = new Date(borrowedOn.getTime() + borrowDuration * 24 * 60 * 60 * 1000);
 
+      // Debugging: Check if Kit ID and Student ID are being processed
+      console.log(`Processing Kit ID: ${kitId}, Student ID: ${studentId}`);
+
       if (isNaN(kitId) || kitId < 0 || kitId > 9) {
           alert('Invalid Kit ID. Please scan a valid NFC tag.');
           return;
@@ -99,28 +103,36 @@ document.addEventListener('DOMContentLoaded', function() {
       formData.append('api_paste_name', 'Borrowed Kits Data');
       formData.append('api_paste_expire_date', '1D'); // Paste expires in 1 day
 
-      const response = await fetch('https://pastebin.com/api/api_post.php', {
-          method: 'POST',
-          body: formData
-      });
+      console.log("Creating paste on Pastebin...");
 
-      const pasteUrl = await response.text();
-      console.log(`Paste created: ${pasteUrl}`);
-      pasteKey = pasteUrl.split('/').pop(); // Extract the paste key from the URL
+      try {
+          const response = await fetch('https://pastebin.com/api/api_post.php', {
+              method: 'POST',
+              body: formData
+          });
+
+          const pasteUrl = await response.text();
+          console.log(`Paste created: ${pasteUrl}`);
+          pasteKey = pasteUrl.split('/').pop(); // Extract the paste key from the URL
+          console.log(`Paste Key: ${pasteKey}`);
+      } catch (error) {
+          console.error("Error creating paste on Pastebin:", error);
+      }
   }
 
   // Function to check the paste on Pastebin every 5 seconds and update data
   setInterval(async function() {
       if (pasteKey) {
+          console.log(`Checking paste data for key: ${pasteKey}`);
           try {
-              // Fetch the data from Pastebin with CORS proxy
               const response = await fetch(`${CORS_PROXY}https://pastebin.com/raw/${pasteKey}`);
               const responseText = await response.text();
+              console.log("Raw Pastebin response:", responseText);
 
               try {
                   const updatedKits = JSON.parse(responseText);  // Ensure it's valid JSON
+                  console.log("Parsed Kits Data from Pastebin:", updatedKits);
 
-                  // Compare with localStorage to see if there's any change
                   const localKits = JSON.parse(localStorage.getItem('borrowedKits')) || [];
                   if (JSON.stringify(updatedKits) !== JSON.stringify(localKits)) {
                       console.log('Pastebin data has changed. Updating...');
@@ -133,6 +145,8 @@ document.addEventListener('DOMContentLoaded', function() {
           } catch (fetchError) {
               console.error('Error fetching data from Pastebin:', fetchError);
           }
+      } else {
+          console.log("Paste key is not available yet.");
       }
   }, 5000); // Check every 5 seconds
 
@@ -188,6 +202,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Load existing data and render the table when on data.html
   if (document.getElementById('kits-table')) {
+      console.log("Rendering initial table data...");
       renderTable();
   }
 });
