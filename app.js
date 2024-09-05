@@ -1,66 +1,75 @@
 document.addEventListener('DOMContentLoaded', async function() {
     console.log("DOM fully loaded and parsed.");
-    const scanNFCButton = document.getElementById('scan-nfc');
+    
+    // Pastebin setup
     const pasteKey = 'h46WwgDE';  // Your existing Pastebin paste key
     const CORS_PROXY = 'https://api.allorigins.win/get?url=';
+    
+    // DOM Elements
+    const loginForm = document.getElementById('login-form');
+    const submitButton = document.getElementById('submit-button');
+    const toggleDarkModeButton = document.getElementById('toggle-dark-mode');
+    const logoutButton = document.getElementById('logout-button');
+    
+    // Login button event listener
+    if (loginForm) {
+      loginForm.addEventListener('submit', function(event) {
+        event.preventDefault(); // Prevent form from refreshing the page
+        const username = document.getElementById('login-username').value;
+        const password = document.getElementById('login-password').value;
   
-    // Fetch data from Pastebin on refresh
-    await fetchDataFromPastebin();
-  
-    // NFC Reading Setup
-    async function startNFCScan() {
-      try {
-        if ('NDEFReader' in window) {
-          const ndef = new NDEFReader();
-          await ndef.scan();
-          console.log("NFC scan started. Tap NFC tag to read Kit ID.");
-  
-          ndef.onreading = event => {
-            const decoder = new TextDecoder();
-            for (const record of event.message.records) {
-              const kitId = decoder.decode(record.data); // Get Kit ID from NFC tag
-              console.log(`Kit ID ${kitId} read from NFC tag`);
-  
-              const studentId = prompt("Please enter your Student ID:");
-  
-              if (studentId) {
-                borrowKit(kitId, studentId);
-              } else {
-                alert("Student ID is required to borrow the kit.");
-              }
-            }
-          };
-  
-          ndef.onreadingerror = () => {
-            console.error("Cannot read NFC tag.");
-            alert("Error reading NFC tag.");
-          };
+        // Simple authentication check
+        if (username === 'admin' && password === 'admin123') {
+          window.location.href = 'data.html'; // Redirect to data.html upon successful login
         } else {
-          alert("NFC is not supported on this device or browser.");
+          alert('Incorrect username or password');
         }
-      } catch (error) {
-        console.error(`Error starting NFC scan: ${error}`);
-        alert("NFC is not supported on this device or browser.");
+      });
+    }
+  
+    // Submit button event listener for logging kit borrowing
+    if (submitButton) {
+      submitButton.addEventListener('click', async function() {
+        const kitId = document.getElementById('kit-id').value;
+        const studentId = document.getElementById('student-id').value;
+        if (!kitId || !studentId) {
+          alert('Please enter a valid Kit ID and Student ID');
+          return;
+        }
+        await borrowKit(kitId, studentId); // Borrow kit and update Pastebin
+      });
+    }
+  
+    // Dark mode toggle button event listener
+    if (toggleDarkModeButton) {
+      toggleDarkModeButton.addEventListener('click', function() {
+        document.body.classList.toggle('dark-mode');
+        const isDarkMode = document.body.classList.contains('dark-mode');
+        localStorage.setItem('darkMode', isDarkMode ? 'enabled' : 'disabled');
+      });
+  
+      // Load saved dark mode preference on page load
+      const darkMode = localStorage.getItem('darkMode');
+      if (darkMode === 'enabled') {
+        document.body.classList.add('dark-mode');
       }
     }
   
-    // Event listener for NFC scan button
-    if (scanNFCButton) {
-      scanNFCButton.addEventListener('click', startNFCScan);
+    // Logout button event listener
+    if (logoutButton) {
+      logoutButton.addEventListener('click', function() {
+        window.location.href = 'index.html'; // Redirect to login page
+      });
     }
   
-    // Function to handle borrowing a kit and update both local storage and Pastebin
+    // Load data from Pastebin on refresh
+    await fetchDataFromPastebin();
+  
+    // Borrow Kit function
     async function borrowKit(kitId, studentId) {
       const borrowDuration = 7;  // Default borrow duration is 7 days
       const borrowedOn = new Date();
       const returnBy = new Date(borrowedOn.getTime() + borrowDuration * 24 * 60 * 60 * 1000);
-  
-      console.log(`Processing Kit ID: ${kitId}, Student ID: ${studentId}`);
-  
-      if (isNaN(kitId) || kitId < 0 || kitId > 9) {
-        alert('Invalid Kit ID. Please scan a valid NFC tag.');
-        return;
-      }
   
       let borrowedKits = JSON.parse(localStorage.getItem('borrowedKits')) || [];
   
