@@ -2,7 +2,8 @@ document.addEventListener('DOMContentLoaded', function() {
   console.log("DOM fully loaded and parsed.");
   const scanNFCButton = document.getElementById('scan-nfc');
   const pasteKey = 'h46WwgDE';  // Your existing Pastebin paste key
-  const CORS_PROXY = 'https://api.allorigins.win/get?url='; // AllOrigins CORS proxy
+  const CORS_PROXY = 'https://api.allorigins.win/get?url=';
+  let lastLocalUpdate = new Date();  // Track the last local update time to avoid overwriting
 
   // NFC Reading Setup
   async function startNFCScan() {
@@ -42,15 +43,16 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   // Event listener for NFC scan button
-  scanNFCButton.addEventListener('click', startNFCScan);
+  if (scanNFCButton) {
+      scanNFCButton.addEventListener('click', startNFCScan);
+  }
 
-  // Function to handle borrowing a kit and update local storage
-  function borrowKit(kitId, studentId) {
+  // Function to handle borrowing a kit and update both local storage and Pastebin
+  async function borrowKit(kitId, studentId) {
       const borrowDuration = 7;  // Default borrow duration is 7 days
       const borrowedOn = new Date();
       const returnBy = new Date(borrowedOn.getTime() + borrowDuration * 24 * 60 * 60 * 1000);
 
-      // Debugging: Check if Kit ID and Student ID are being processed
       console.log(`Processing Kit ID: ${kitId}, Student ID: ${studentId}`);
 
       if (isNaN(kitId) || kitId < 0 || kitId > 9) {
@@ -72,6 +74,7 @@ document.addEventListener('DOMContentLoaded', function() {
           return;
       }
 
+      // Add the new borrowing data
       borrowedKits.push({
           kitId: kitId,
           studentId: studentId,
@@ -80,12 +83,44 @@ document.addEventListener('DOMContentLoaded', function() {
           status: 'Borrowed'
       });
 
+      // Save to localStorage and update the table
       localStorage.setItem('borrowedKits', JSON.stringify(borrowedKits));
       renderTable();
+
+      // Now update Pastebin with the new borrowed kits data
+      await updatePastebin(borrowedKits);
+
       alert('Kit successfully borrowed for 7 days!');
   }
 
-  // Function to check the paste on Pastebin every 5 seconds and update data
+  // Function to update Pastebin with the latest borrowed kits data
+  async function updatePastebin(borrowedKits) {
+      const pasteContent = JSON.stringify(borrowedKits, null, 2);
+      const formData = new URLSearchParams();
+      formData.append('api_dev_key', 'your-pastebin-api-key');  // Replace with your Pastebin API key
+      formData.append('api_user_key', 'your-pastebin-user-key');  // Replace with your Pastebin User key
+      formData.append('api_option', 'paste');
+      formData.append('api_paste_code', pasteContent);
+      formData.append('api_paste_private', '1'); // Unlisted
+      formData.append('api_paste_name', 'Borrowed Kits Data');
+      formData.append('api_paste_expire_date', '1D'); // Paste expires in 1 day
+
+      try {
+          console.log("Updating Pastebin with new data...");
+          const response = await fetch(`https://pastebin.com/api/api_post.php`, {
+              method: 'POST',
+              body: formData
+          });
+
+          const pasteUrl = await response.text();
+          console.log(`Paste updated: ${pasteUrl}`);
+          lastLocalUpdate = new Date();  // Track the local update timestamp
+      } catch (error) {
+          console.error("Error updating Pastebin:", error);
+      }
+  }
+
+  // Function to check the paste on Pastebin every 5 seconds and update local data
   setInterval(async function() {
       if (pasteKey) {
           console.log(`Checking paste data for key: ${pasteKey}`);
@@ -97,11 +132,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
               try {
                   const updatedKits = JSON.parse(responseText);  // Ensure it's valid JSON
-                  console.log("Parsed Kits Data from Pastebin:", updatedKits);
 
                   const localKits = JSON.parse(localStorage.getItem('borrowedKits')) || [];
-                  if (JSON.stringify(updatedKits) !== JSON.stringify(localKits)) {
-                      console.log('Pastebin data has changed. Updating...');
+
+                  // Only update local data if the paste data has changed AND local data wasn't updated recently
+                  if (JSON.stringify(updatedKits) !== JSON.stringify(localKits) && new Date() - lastLocalUpdate > 5000) {
+                      console.log('Pastebin data has changed. Updating local data...');
                       localStorage.setItem('borrowedKits', JSON.stringify(updatedKits));
                       renderTable(); // Re-render the table with updated data
                   }
