@@ -4,13 +4,16 @@ document.addEventListener('DOMContentLoaded', async function() {
     // Pastebin setup
     const pasteKey = 'h46WwgDE';  // Your existing Pastebin paste key
     const CORS_PROXY = 'https://api.allorigins.win/get?url=';
-    
+  
     // DOM Elements
     const loginForm = document.getElementById('login-form');
     const submitButton = document.getElementById('submit-button');
     const toggleDarkModeButton = document.getElementById('toggle-dark-mode');
     const logoutButton = document.getElementById('logout-button');
-    
+  
+    // Fetch data from Pastebin on page load
+    await fetchDataFromPastebin();
+  
     // Login button event listener
     if (loginForm) {
       loginForm.addEventListener('submit', function(event) {
@@ -62,49 +65,7 @@ document.addEventListener('DOMContentLoaded', async function() {
       });
     }
   
-    // Load data from Pastebin on refresh
-    await fetchDataFromPastebin();
-  
-    // Borrow Kit function
-    async function borrowKit(kitId, studentId) {
-      const borrowDuration = 7;  // Default borrow duration is 7 days
-      const borrowedOn = new Date();
-      const returnBy = new Date(borrowedOn.getTime() + borrowDuration * 24 * 60 * 60 * 1000);
-  
-      let borrowedKits = JSON.parse(localStorage.getItem('borrowedKits')) || [];
-  
-      const existingStudent = borrowedKits.find(k => k.studentId === studentId);
-      if (existingStudent) {
-        alert('You have already borrowed a kit. Please return it before borrowing another.');
-        return;
-      }
-  
-      const existingKit = borrowedKits.find(k => k.kitId === kitId);
-      if (existingKit && existingKit.status === 'Borrowed') {
-        alert('This kit is already borrowed. Please choose another kit.');
-        return;
-      }
-  
-      // Add the new borrowing data
-      borrowedKits.push({
-        kitId: kitId,
-        studentId: studentId,
-        borrowedOn: borrowedOn.toISOString(),
-        returnBy: returnBy.toISOString(),
-        status: 'Borrowed'
-      });
-  
-      // Save to localStorage and update the table
-      localStorage.setItem('borrowedKits', JSON.stringify(borrowedKits));
-      renderTable();
-  
-      // Now update Pastebin with the new borrowed kits data
-      await updatePastebin(borrowedKits);
-  
-      alert('Kit successfully borrowed for 7 days!');
-    }
-  
-    // Function to fetch data from Pastebin and update local data
+    // Function to fetch data from Pastebin and update local table
     async function fetchDataFromPastebin() {
       try {
         console.log(`Fetching data from Pastebin for key: ${pasteKey}`);
@@ -114,9 +75,8 @@ document.addEventListener('DOMContentLoaded', async function() {
         console.log("Raw Pastebin response:", responseText);
   
         try {
-          const fetchedKits = JSON.parse(responseText);  // Ensure it's valid JSON
-          localStorage.setItem('borrowedKits', JSON.stringify(fetchedKits));
-          renderTable(); // Re-render the table with fetched data
+          const borrowedKits = JSON.parse(responseText);  // Ensure it's valid JSON
+          renderTable(borrowedKits); // Re-render the table with fetched data
         } catch (jsonError) {
           console.error('Error parsing JSON from Pastebin:', jsonError);
         }
@@ -151,12 +111,51 @@ document.addEventListener('DOMContentLoaded', async function() {
       }
     }
   
-    // Function to render the table based on localStorage data
-    function renderTable() {
+    // Function to handle borrowing a kit and updating Pastebin
+    async function borrowKit(kitId, studentId) {
+      const borrowDuration = 7;  // Default borrow duration is 7 days
+      const borrowedOn = new Date();
+      const returnBy = new Date(borrowedOn.getTime() + borrowDuration * 24 * 60 * 60 * 1000);
+  
+      console.log(`Processing Kit ID: ${kitId}, Student ID: ${studentId}`);
+  
+      // Fetch existing data from Pastebin
+      const response = await fetch(`${CORS_PROXY}${encodeURIComponent(`https://pastebin.com/raw/${pasteKey}`)}`);
+      const data = await response.json();
+      const borrowedKits = JSON.parse(data.contents) || [];
+  
+      // Check if the student or kit is already in use
+      const existingStudent = borrowedKits.find(k => k.studentId === studentId);
+      if (existingStudent) {
+        alert('You have already borrowed a kit. Please return it before borrowing another.');
+        return;
+      }
+  
+      const existingKit = borrowedKits.find(k => k.kitId === kitId);
+      if (existingKit && existingKit.status === 'Borrowed') {
+        alert('This kit is already borrowed. Please choose another kit.');
+        return;
+      }
+  
+      // Add the new borrowing data
+      borrowedKits.push({
+        kitId: kitId,
+        studentId: studentId,
+        borrowedOn: borrowedOn.toISOString(),
+        returnBy: returnBy.toISOString(),
+        status: 'Borrowed'
+      });
+  
+      // Update Pastebin and re-render the table
+      await updatePastebin(borrowedKits);
+      renderTable(borrowedKits);
+      alert('Kit successfully borrowed for 7 days!');
+    }
+  
+    // Function to render the table
+    function renderTable(borrowedKits) {
       const kitsTable = document.getElementById('kits-table').getElementsByTagName('tbody')[0];
       kitsTable.innerHTML = ''; // Clear the table before rendering
-  
-      let borrowedKits = JSON.parse(localStorage.getItem('borrowedKits')) || [];
   
       if (borrowedKits.length === 0) {
         const placeholderRow = kitsTable.insertRow();
@@ -180,10 +179,11 @@ document.addEventListener('DOMContentLoaded', async function() {
           borrowedOnCell.innerText = new Date(kit.borrowedOn).toLocaleString();
           returnByCell.innerText = new Date(kit.returnBy).toLocaleString();
   
+          // Return button to remove entry
           if (kit.status === 'Borrowed') {
             const returnButton = document.createElement('button');
             returnButton.innerText = 'Return';
-            returnButton.addEventListener('click', function() {
+            returnButton.addEventListener('click', async function() {
               removeEntry(kit.kitId);
             });
             removeCell.appendChild(returnButton);
@@ -192,13 +192,16 @@ document.addEventListener('DOMContentLoaded', async function() {
       }
     }
   
-    // Function to remove an entry from the data
-    function removeEntry(kitId) {
-      let borrowedKits = JSON.parse(localStorage.getItem('borrowedKits')) || [];
-      borrowedKits = borrowedKits.filter(kit => kit.kitId !== kitId); // Remove the entry by Kit ID
-      localStorage.setItem('borrowedKits', JSON.stringify(borrowedKits)); // Update localStorage
+    // Function to remove an entry from the data and update Pastebin
+    async function removeEntry(kitId) {
+      const response = await fetch(`${CORS_PROXY}${encodeURIComponent(`https://pastebin.com/raw/${pasteKey}`)}`);
+      const data = await response.json();
+      let borrowedKits = JSON.parse(data.contents) || [];
   
-      renderTable(); // Re-render the table
+      borrowedKits = borrowedKits.filter(kit => kit.kitId !== kitId); // Remove the entry by Kit ID
+  
+      await updatePastebin(borrowedKits); // Update Pastebin with new data
+      renderTable(borrowedKits); // Re-render the table
     }
   
   });
