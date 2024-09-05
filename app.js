@@ -1,9 +1,18 @@
 document.addEventListener('DOMContentLoaded', async function() {
     console.log("DOM fully loaded and parsed.");
-    
-    // Pastebin setup
-    const pasteKey = 'h46WwgDE';  // Your existing Pastebin paste key
-    const CORS_PROXY = 'https://api.allorigins.win/get?url=';
+  
+    // Initialize Firebase
+    const firebaseConfig = {
+        apiKey: "AIzaSyA_HZh6G1lANxndefWo-uGk4UvGBUHByN4",
+        authDomain: "nfctags-d020a.firebaseapp.com",
+        projectId: "nfctags-d020a",
+        storageBucket: "nfctags-d020a.appspot.com",
+        messagingSenderId: "449294593726",
+        appId: "1:449294593726:web:3cb918bf857157cd5df8ef",
+        measurementId: "G-2NEDEYJMH6"
+      };
+    const app = firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
   
     // DOM Elements
     const loginForm = document.getElementById('login-form');
@@ -11,8 +20,8 @@ document.addEventListener('DOMContentLoaded', async function() {
     const toggleDarkModeButton = document.getElementById('toggle-dark-mode');
     const logoutButton = document.getElementById('logout-button');
   
-    // Fetch data from Pastebin on page load
-    await fetchDataFromPastebin();
+    // Fetch data from Firestore on page load
+    await fetchDataFromFirestore();
   
     // Login button event listener
     if (loginForm) {
@@ -39,7 +48,7 @@ document.addEventListener('DOMContentLoaded', async function() {
           alert('Please enter a valid Kit ID and Student ID');
           return;
         }
-        await borrowKit(kitId, studentId); // Borrow kit and update Pastebin
+        await borrowKit(kitId, studentId); // Borrow kit and update Firestore
       });
     }
   
@@ -65,53 +74,29 @@ document.addEventListener('DOMContentLoaded', async function() {
       });
     }
   
-    // Function to fetch data from Pastebin and update local table
-    async function fetchDataFromPastebin() {
+    // Function to fetch data from Firestore and update local table
+    async function fetchDataFromFirestore() {
       try {
-        console.log(`Fetching data from Pastebin for key: ${pasteKey}`);
-        const response = await fetch(`${CORS_PROXY}${encodeURIComponent(`https://pastebin.com/raw/${pasteKey}`)}`);
-        const data = await response.json();
-        const responseText = data.contents;
-        console.log("Raw Pastebin response:", responseText);
-  
-        try {
-          const borrowedKits = JSON.parse(responseText);  // Ensure it's valid JSON
-          renderTable(borrowedKits); // Re-render the table with fetched data
-        } catch (jsonError) {
-          console.error('Error parsing JSON from Pastebin:', jsonError);
-        }
+        const kitsSnapshot = await db.collection('kits').get();
+        const borrowedKits = [];
+        kitsSnapshot.forEach(doc => borrowedKits.push(doc.data()));
+        renderTable(borrowedKits);
       } catch (fetchError) {
-        console.error('Error fetching data from Pastebin:', fetchError);
+        console.error('Error fetching data from Firestore:', fetchError);
       }
     }
   
-    // Function to update Pastebin with the latest borrowed kits data
-    async function updatePastebin(borrowedKits) {
-      const pasteContent = JSON.stringify(borrowedKits, null, 2);
-      const formData = new URLSearchParams();
-      formData.append('api_dev_key', 'your-pastebin-api-key');  // Replace with your Pastebin API key
-      formData.append('api_user_key', 'your-pastebin-user-key');  // Replace with your Pastebin User key
-      formData.append('api_option', 'paste');
-      formData.append('api_paste_code', pasteContent);
-      formData.append('api_paste_private', '1'); // Unlisted
-      formData.append('api_paste_name', 'Borrowed Kits Data');
-      formData.append('api_paste_expire_date', '1D'); // Paste expires in 1 day
-  
+    // Function to add or update kit data in Firestore
+    async function updateFirestore(kitId, kitData) {
       try {
-        console.log("Updating Pastebin with new data...");
-        const response = await fetch(`https://pastebin.com/api/api_post.php`, {
-          method: 'POST',
-          body: formData
-        });
-  
-        const pasteUrl = await response.text();
-        console.log(`Paste updated: ${pasteUrl}`);
+        await db.collection('kits').doc(kitId).set(kitData);
+        console.log(`Kit data successfully written for Kit ID: ${kitId}`);
       } catch (error) {
-        console.error("Error updating Pastebin:", error);
+        console.error("Error updating Firestore:", error);
       }
     }
   
-    // Function to handle borrowing a kit and updating Pastebin
+    // Function to handle borrowing a kit and updating Firestore
     async function borrowKit(kitId, studentId) {
       const borrowDuration = 7;  // Default borrow duration is 7 days
       const borrowedOn = new Date();
@@ -119,36 +104,28 @@ document.addEventListener('DOMContentLoaded', async function() {
   
       console.log(`Processing Kit ID: ${kitId}, Student ID: ${studentId}`);
   
-      // Fetch existing data from Pastebin
-      const response = await fetch(`${CORS_PROXY}${encodeURIComponent(`https://pastebin.com/raw/${pasteKey}`)}`);
-      const data = await response.json();
-      const borrowedKits = JSON.parse(data.contents) || [];
+      // Fetch existing data from Firestore
+      const doc = await db.collection('kits').doc(kitId).get();
+      const borrowedKits = doc.exists ? doc.data() : {};
   
       // Check if the student or kit is already in use
-      const existingStudent = borrowedKits.find(k => k.studentId === studentId);
-      if (existingStudent) {
-        alert('You have already borrowed a kit. Please return it before borrowing another.');
-        return;
-      }
-  
-      const existingKit = borrowedKits.find(k => k.kitId === kitId);
-      if (existingKit && existingKit.status === 'Borrowed') {
+      if (borrowedKits.studentId && borrowedKits.status === 'Borrowed') {
         alert('This kit is already borrowed. Please choose another kit.');
         return;
       }
   
       // Add the new borrowing data
-      borrowedKits.push({
+      const newKitData = {
         kitId: kitId,
         studentId: studentId,
         borrowedOn: borrowedOn.toISOString(),
         returnBy: returnBy.toISOString(),
         status: 'Borrowed'
-      });
+      };
   
-      // Update Pastebin and re-render the table
-      await updatePastebin(borrowedKits);
-      renderTable(borrowedKits);
+      // Update Firestore and re-render the table
+      await updateFirestore(kitId, newKitData);
+      await fetchDataFromFirestore();
       alert('Kit successfully borrowed for 7 days!');
     }
   
@@ -184,7 +161,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             const returnButton = document.createElement('button');
             returnButton.innerText = 'Return';
             returnButton.addEventListener('click', async function() {
-              removeEntry(kit.kitId);
+              await returnKit(kit.kitId);
             });
             removeCell.appendChild(returnButton);
           }
@@ -192,17 +169,20 @@ document.addEventListener('DOMContentLoaded', async function() {
       }
     }
   
-    // Function to remove an entry from the data and update Pastebin
-    async function removeEntry(kitId) {
-      const response = await fetch(`${CORS_PROXY}${encodeURIComponent(`https://pastebin.com/raw/${pasteKey}`)}`);
-      const data = await response.json();
-      let borrowedKits = JSON.parse(data.contents) || [];
-  
-      borrowedKits = borrowedKits.filter(kit => kit.kitId !== kitId); // Remove the entry by Kit ID
-  
-      await updatePastebin(borrowedKits); // Update Pastebin with new data
-      renderTable(borrowedKits); // Re-render the table
+    // Function to return a kit and update Firestore
+    async function returnKit(kitId) {
+      try {
+        await db.collection('kits').doc(kitId).update({
+          status: 'Available',
+          studentId: null,
+          borrowedOn: null,
+          returnBy: null
+        });
+        console.log(`Kit ID ${kitId} returned successfully.`);
+        await fetchDataFromFirestore();
+      } catch (error) {
+        console.error("Error returning kit:", error);
+      }
     }
   
   });
-  
