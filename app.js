@@ -2,7 +2,7 @@ document.addEventListener('DOMContentLoaded', function() {
   console.log("DOM fully loaded and parsed.");
   const scanNFCButton = document.getElementById('scan-nfc');
   const pasteKey = 'h46WwgDE';  // Your existing Pastebin paste key
-  const CORS_PROXY = 'https://api.allorigins.win/get?url=';
+  const CORS_PROXY = 'https://api.allorigins.win/get?url='; // AllOrigins CORS proxy
 
   // NFC Reading Setup
   async function startNFCScan() {
