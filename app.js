@@ -1,6 +1,5 @@
 document.addEventListener('DOMContentLoaded', function() {
   const scanNFCButton = document.getElementById('scan-nfc');
-  const kitIdInput = document.getElementById('kit-id');
   
   // NFC Reading Setup
   async function startNFCScan() {
@@ -45,11 +44,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Function to handle borrowing a kit
   function borrowKit(kitId, studentId) {
-      const borrowDuration = prompt("Enter borrow duration in days (e.g., 3):");
-      if (!borrowDuration || isNaN(borrowDuration)) {
-          alert("Invalid borrow duration.");
-          return;
-      }
+      const borrowDuration = 7; // Default borrow duration is 7 days
 
       const borrowedOn = new Date();
       const returnBy = new Date(borrowedOn.getTime() + borrowDuration * 24 * 60 * 60 * 1000);
@@ -91,7 +86,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
       // Refresh the table to include the new entry
       renderTable();
-      alert('Kit successfully borrowed!');
+      alert('Kit successfully borrowed for 7 days!');
   }
 
   // Function to render the table based on localStorage data
