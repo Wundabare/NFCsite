@@ -2,7 +2,7 @@ document.addEventListener('DOMContentLoaded', function() {
   console.log("DOM fully loaded and parsed.");
   const scanNFCButton = document.getElementById('scan-nfc');
   const pasteKey = 'h46WwgDE';  // Your existing Pastebin paste key
-  const CORS_PROXY = 'https://cors-anywhere.herokuapp.com/';
+  const CORS_PROXY = 'https://api.allorigins.win/get?url=';
 
   // NFC Reading Setup
   async function startNFCScan() {
@@ -90,8 +90,9 @@ document.addEventListener('DOMContentLoaded', function() {
       if (pasteKey) {
           console.log(`Checking paste data for key: ${pasteKey}`);
           try {
-              const response = await fetch(`${CORS_PROXY}https://pastebin.com/raw/${pasteKey}`);
-              const responseText = await response.text();
+              const response = await fetch(`${CORS_PROXY}${encodeURIComponent(`https://pastebin.com/raw/${pasteKey}`)}`);
+              const data = await response.json();
+              const responseText = data.contents;
               console.log("Raw Pastebin response:", responseText);
 
               try {
