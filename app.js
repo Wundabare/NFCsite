@@ -1,12 +1,7 @@
 document.addEventListener('DOMContentLoaded', function() {
   console.log("DOM fully loaded and parsed.");
   const scanNFCButton = document.getElementById('scan-nfc');
-  let pasteKey = '';  // Will hold the Pastebin paste key after it's created
-
-  const PASTEBIN_API_KEY = 'your-pastebin-api-key'; // Replace with your API key
-  const PASTEBIN_USER_KEY = 'your-pastebin-user-key'; // Replace with your User key
-
-  // CORS Proxy for handling Pastebin restrictions
+  const pasteKey = 'h46WwgDE';  // Your existing Pastebin paste key
   const CORS_PROXY = 'https://cors-anywhere.herokuapp.com/';
 
   // NFC Reading Setup
@@ -49,8 +44,8 @@ document.addEventListener('DOMContentLoaded', function() {
   // Event listener for NFC scan button
   scanNFCButton.addEventListener('click', startNFCScan);
 
-  // Function to handle borrowing a kit and create a Pastebin paste
-  async function borrowKit(kitId, studentId) {
+  // Function to handle borrowing a kit and update local storage
+  function borrowKit(kitId, studentId) {
       const borrowDuration = 7;  // Default borrow duration is 7 days
       const borrowedOn = new Date();
       const returnBy = new Date(borrowedOn.getTime() + borrowDuration * 24 * 60 * 60 * 1000);
@@ -86,38 +81,8 @@ document.addEventListener('DOMContentLoaded', function() {
       });
 
       localStorage.setItem('borrowedKits', JSON.stringify(borrowedKits));
-      await createPasteOnPastebin(borrowedKits);
       renderTable();
       alert('Kit successfully borrowed for 7 days!');
-  }
-
-  // Function to create a paste on Pastebin with borrowed kits data
-  async function createPasteOnPastebin(borrowedKits) {
-      const pasteContent = JSON.stringify(borrowedKits, null, 2);
-      const formData = new URLSearchParams();
-      formData.append('api_dev_key', PASTEBIN_API_KEY);
-      formData.append('api_user_key', PASTEBIN_USER_KEY);
-      formData.append('api_option', 'paste');
-      formData.append('api_paste_code', pasteContent);
-      formData.append('api_paste_private', '1'); // Unlisted
-      formData.append('api_paste_name', 'Borrowed Kits Data');
-      formData.append('api_paste_expire_date', '1D'); // Paste expires in 1 day
-
-      console.log("Creating paste on Pastebin...");
-
-      try {
-          const response = await fetch('https://pastebin.com/api/api_post.php', {
-              method: 'POST',
-              body: formData
-          });
-
-          const pasteUrl = await response.text();
-          console.log(`Paste created: ${pasteUrl}`);
-          pasteKey = pasteUrl.split('/').pop(); // Extract the paste key from the URL
-          console.log(`Paste Key: ${pasteKey}`);
-      } catch (error) {
-          console.error("Error creating paste on Pastebin:", error);
-      }
   }
 
   // Function to check the paste on Pastebin every 5 seconds and update data
