@@ -1,6 +1,10 @@
 document.addEventListener('DOMContentLoaded', function() {
   const scanNFCButton = document.getElementById('scan-nfc');
-  
+  let pasteKey = '';  // Will hold the Pastebin paste key after it's created
+
+  const PASTEBIN_API_KEY = 'OKC8f3WSNJk1Ugk6MuZbRYJHGWS80vVf'; 
+  const PASTEBIN_USER_KEY = 'f2883ad0e7fedcf32d6dce37c11e3588'; 
+
   // NFC Reading Setup
   async function startNFCScan() {
       try {
@@ -15,7 +19,6 @@ document.addEventListener('DOMContentLoaded', function() {
                       const kitId = decoder.decode(record.data); // Get Kit ID from NFC tag
                       console.log(`Kit ID ${kitId} read from NFC tag`);
 
-                      // Prompt the user to enter the Student ID
                       const studentId = prompt("Please enter your Student ID:");
 
                       if (studentId) {
@@ -42,10 +45,9 @@ document.addEventListener('DOMContentLoaded', function() {
   // Event listener for NFC scan button
   scanNFCButton.addEventListener('click', startNFCScan);
 
-  // Function to handle borrowing a kit
-  function borrowKit(kitId, studentId) {
-      const borrowDuration = 7; // Default borrow duration is 7 days
-
+  // Function to handle borrowing a kit and create a Pastebin paste
+  async function borrowKit(kitId, studentId) {
+      const borrowDuration = 7;  // Default borrow duration is 7 days
       const borrowedOn = new Date();
       const returnBy = new Date(borrowedOn.getTime() + borrowDuration * 24 * 60 * 60 * 1000);
 
@@ -55,17 +57,14 @@ document.addEventListener('DOMContentLoaded', function() {
           return;
       }
 
-      // Get existing data from localStorage
       let borrowedKits = JSON.parse(localStorage.getItem('borrowedKits')) || [];
 
-      // Check if the student has already borrowed a kit
       const existingStudent = borrowedKits.find(k => k.studentId === studentId);
       if (existingStudent) {
           alert('You have already borrowed a kit. Please return it before borrowing another.');
           return;
       }
 
-      // Check if the kit is already borrowed
       const existingKit = borrowedKits.find(k => k.kitId === kitId);
       if (existingKit && existingKit.status === 'Borrowed') {
           alert('This kit is already borrowed. Please choose another kit.');
@@ -84,10 +83,51 @@ document.addEventListener('DOMContentLoaded', function() {
       // Store updated data back to localStorage
       localStorage.setItem('borrowedKits', JSON.stringify(borrowedKits));
 
+      // Create a new paste on Pastebin
+      await createPasteOnPastebin(borrowedKits);
+
       // Refresh the table to include the new entry
       renderTable();
       alert('Kit successfully borrowed for 7 days!');
   }
+
+  // Function to create a paste on Pastebin with borrowed kits data
+  async function createPasteOnPastebin(borrowedKits) {
+      const pasteContent = JSON.stringify(borrowedKits, null, 2);
+      const formData = new URLSearchParams();
+      formData.append('api_dev_key', PASTEBIN_API_KEY);
+      formData.append('api_user_key', PASTEBIN_USER_KEY);
+      formData.append('api_option', 'paste');
+      formData.append('api_paste_code', pasteContent);
+      formData.append('api_paste_private', '1'); // Unlisted
+      formData.append('api_paste_name', 'Borrowed Kits Data');
+      formData.append('api_paste_expire_date', '1D'); // Paste expires in 1 day
+
+      const response = await fetch('https://pastebin.com/api/api_post.php', {
+          method: 'POST',
+          body: formData
+      });
+
+      const pasteUrl = await response.text();
+      console.log(`Paste created: ${pasteUrl}`);
+      pasteKey = pasteUrl.split('/').pop(); // Extract the paste key from the URL
+  }
+
+  // Function to check the paste on Pastebin every 5 seconds and update data
+  setInterval(async function() {
+      if (pasteKey) {
+          const response = await fetch(`https://pastebin.com/raw/${pasteKey}`);
+          const updatedKits = await response.json();
+
+          // Compare with localStorage to see if there's any change
+          const localKits = JSON.parse(localStorage.getItem('borrowedKits')) || [];
+          if (JSON.stringify(updatedKits) !== JSON.stringify(localKits)) {
+              console.log('Pastebin data has changed. Updating...');
+              localStorage.setItem('borrowedKits', JSON.stringify(updatedKits));
+              renderTable(); // Re-render the table with updated data
+          }
+      }
+  }, 5000); // Check every 5 seconds
 
   // Function to render the table based on localStorage data
   function renderTable() {
@@ -97,7 +137,6 @@ document.addEventListener('DOMContentLoaded', function() {
       let borrowedKits = JSON.parse(localStorage.getItem('borrowedKits')) || [];
 
       if (borrowedKits.length === 0) {
-          // Show placeholder if no entries exist
           const placeholderRow = kitsTable.insertRow();
           const placeholderCell = placeholderRow.insertCell(0);
           placeholderCell.colSpan = 6;
@@ -119,7 +158,6 @@ document.addEventListener('DOMContentLoaded', function() {
               borrowedOnCell.innerText = new Date(kit.borrowedOn).toLocaleString();
               returnByCell.innerText = new Date(kit.returnBy).toLocaleString();
 
-              // Create and append the "Return" button for borrowed kits
               if (kit.status === 'Borrowed') {
                   const returnButton = document.createElement('button');
                   returnButton.innerText = 'Return';
