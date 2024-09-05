@@ -5,6 +5,9 @@ document.addEventListener('DOMContentLoaded', function() {
   const PASTEBIN_API_KEY = 'OKC8f3WSNJk1Ugk6MuZbRYJHGWS80vVf'; 
   const PASTEBIN_USER_KEY = 'f2883ad0e7fedcf32d6dce37c11e3588'; 
 
+  // CORS Proxy for handling Pastebin restrictions
+  const CORS_PROXY = 'https://cors-anywhere.herokuapp.com/';
+
   // NFC Reading Setup
   async function startNFCScan() {
       try {
@@ -51,7 +54,6 @@ document.addEventListener('DOMContentLoaded', function() {
       const borrowedOn = new Date();
       const returnBy = new Date(borrowedOn.getTime() + borrowDuration * 24 * 60 * 60 * 1000);
 
-      // Validate the Kit ID and ensure it's within 0-9
       if (isNaN(kitId) || kitId < 0 || kitId > 9) {
           alert('Invalid Kit ID. Please scan a valid NFC tag.');
           return;
@@ -71,7 +73,6 @@ document.addEventListener('DOMContentLoaded', function() {
           return;
       }
 
-      // Add or update the kit entry
       borrowedKits.push({
           kitId: kitId,
           studentId: studentId,
@@ -80,13 +81,8 @@ document.addEventListener('DOMContentLoaded', function() {
           status: 'Borrowed'
       });
 
-      // Store updated data back to localStorage
       localStorage.setItem('borrowedKits', JSON.stringify(borrowedKits));
-
-      // Create a new paste on Pastebin
       await createPasteOnPastebin(borrowedKits);
-
-      // Refresh the table to include the new entry
       renderTable();
       alert('Kit successfully borrowed for 7 days!');
   }
@@ -116,15 +112,26 @@ document.addEventListener('DOMContentLoaded', function() {
   // Function to check the paste on Pastebin every 5 seconds and update data
   setInterval(async function() {
       if (pasteKey) {
-          const response = await fetch(`https://pastebin.com/raw/${pasteKey}`);
-          const updatedKits = await response.json();
+          try {
+              // Fetch the data from Pastebin with CORS proxy
+              const response = await fetch(`${CORS_PROXY}https://pastebin.com/raw/${pasteKey}`);
+              const responseText = await response.text();
 
-          // Compare with localStorage to see if there's any change
-          const localKits = JSON.parse(localStorage.getItem('borrowedKits')) || [];
-          if (JSON.stringify(updatedKits) !== JSON.stringify(localKits)) {
-              console.log('Pastebin data has changed. Updating...');
-              localStorage.setItem('borrowedKits', JSON.stringify(updatedKits));
-              renderTable(); // Re-render the table with updated data
+              try {
+                  const updatedKits = JSON.parse(responseText);  // Ensure it's valid JSON
+
+                  // Compare with localStorage to see if there's any change
+                  const localKits = JSON.parse(localStorage.getItem('borrowedKits')) || [];
+                  if (JSON.stringify(updatedKits) !== JSON.stringify(localKits)) {
+                      console.log('Pastebin data has changed. Updating...');
+                      localStorage.setItem('borrowedKits', JSON.stringify(updatedKits));
+                      renderTable(); // Re-render the table with updated data
+                  }
+              } catch (jsonError) {
+                  console.error('Error parsing JSON from Pastebin:', jsonError);
+              }
+          } catch (fetchError) {
+              console.error('Error fetching data from Pastebin:', fetchError);
           }
       }
   }, 5000); // Check every 5 seconds
