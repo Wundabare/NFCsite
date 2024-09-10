@@ -1,18 +1,20 @@
 /* General body styling */
 body {
-  background-color: #F7F7F7;
+  background-color: #f7f7f7;
   margin: 0;
-  font-family: 'Roboto', sans-serif;
+  font-family: "Roboto", sans-serif;
   color: #333;
 }
 
 /* Light Mode Styles */
 body.light-mode {
-  background-color: #F7F7F7;
+  background-color: #f7f7f7;
   color: #333;
 }
 
-.login-container, .form-container, .kits-container {
+.login-container,
+.form-container,
+.kits-container {
   background-color: #ffffff;
   padding: 40px;
   border-radius: 12px;
@@ -48,7 +50,7 @@ body.dark-mode td {
 }
 
 #toggle-mode {
-  background-color: #4B0082;
+  background-color: #4b0082;
   color: white;
   border: none;
   padding: 10px 20px;
@@ -59,7 +61,7 @@ body.dark-mode td {
 }
 
 #toggle-mode:hover {
-  background-color: #6A0DAD;
+  background-color: #6a0dad;
 }
 
 #mode-icon {
@@ -71,4 +73,3 @@ table tbody tr {
   height: 50px;
   text-align: center;
 }
-
